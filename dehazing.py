@@ -7,7 +7,7 @@ from net.losses import StdLoss
 from utils.imresize import imresize, np_imresize
 from net.noise import get_noise
 from utils.image_io import *
-from skimage.measure import compare_psnr
+from skimage.metrics import peak_signal_noise_ratio
 import torch.nn as nn
 import progressbar
 
@@ -263,7 +263,7 @@ class Dehaze(object):
             image_out_np = np.clip(torch_to_np(self.image_out), 0, 1)
             mask_out_np = np.clip(torch_to_np(self.mask_out), 0, 1)
             ambient_out_np = np.clip(torch_to_np(self.ambient_out), 0, 1)
-            psnr = compare_psnr(self.images[0], mask_out_np * image_out_np + (1 - mask_out_np) * ambient_out_np)
+            psnr = peak_signal_noise_ratio(self.images[0], mask_out_np * image_out_np + (1 - mask_out_np) * ambient_out_np)
             self.current_result = DehazeResult(learned=image_out_np, t=mask_out_np, a=ambient_out_np, psnr=psnr)
             if self.best_result is None or self.best_result.psnr < self.current_result.psnr:
                 self.best_result = self.current_result

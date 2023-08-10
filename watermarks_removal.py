@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-from skimage.measure import compare_psnr
+from skimage.metrics import peak_signal_noise_ratio
 
 from net import *
 from net.downsampler import *
@@ -254,7 +254,7 @@ class Watermark(object):
             mask_out_np = torch_to_np(self.watermark_net_output)
             if step_number == 0:
                 self.current_psnr = 0
-            self.current_psnr = compare_psnr(self.image, mask_out_np * self.watermark_hint * watermark_out_np +
+            self.current_psnr = peak_signal_noise_ratio(self.image, mask_out_np * self.watermark_hint * watermark_out_np +
                                              (1 - mask_out_np) * clean_out_np)
             if self.current_gradient is not None:
                 print('Iteration {:5d} total_loss {:5f} grad {:5f} PSNR {:5f} '.format(iter_number, self.total_loss.item(),

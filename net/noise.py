@@ -17,6 +17,7 @@ def get_noise(input_depth, method, spatial_size, noise_type='u', var=1. / 100):
         noise_type: 'u' for uniform; 'n' for normal
         var: a factor, a noise will be multiplicated by. Basically it is standard deviation scaler.
     """
+    import pdb; pdb.set_trace()
     if isinstance(spatial_size, int):
         spatial_size = (spatial_size, spatial_size)
     if method == 'noise':
@@ -85,6 +86,7 @@ def get_video_noise(input_depth, method, temporal_size, spatial_size, noise_type
 
 
 class NoiseNet(nn.Module):
+    # wird in segmentation verwendet
     def __init__(self, channels=3, kernel_size=5):
         super(NoiseNet, self).__init__()
         self.kernel_size = kernel_size

@@ -55,7 +55,7 @@ def crop_torch_image(img, d=32):
     assert len(img.shape) == 3
     return img[:, pad[-2]: pad[-2] + new_size[-2], pad[-1]: pad[-1] + new_size[-1]]
 
-
+# currently not used
 def get_params(opt_over, net, net_input, downsampler=None):
     """
     Returns parameters that we want to optimize over.

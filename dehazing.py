@@ -106,6 +106,7 @@ class Dehaze(object):
             new_shape_y -= (new_shape_y % 32)
             image = np_imresize(self.image, output_shape=(new_shape_x, new_shape_y))
             factor += 1
+        # liste mit org image und 4 augmentierten Bildern
         self.images = create_augmentations(image)
         self.images_torch = [np_to_torch(image).type(torch.cuda.FloatTensor) for image in self.images]
 
@@ -154,10 +155,12 @@ class Dehaze(object):
                 need_sigmoid=True, need_bias=True, pad='reflection', act_fun='LeakyReLU')
             self.ambient_net = ambient_net.type(torch.cuda.FloatTensor)
         if isinstance(self.gt_ambient, np.ndarray):
+            # one rgb value
             atmosphere = self.gt_ambient
         else:
-            # use_deep_channel_prior is True
+            # use_deep_channel_prior is True,  one rgb value
             atmosphere = get_atmosphere(self.image)
+        # atmosphere to tensor
         self.ambient_val = nn.Parameter(data=torch.cuda.FloatTensor(atmosphere.reshape((1, 3, 1, 1))),
                                         requires_grad=False)
 
@@ -193,11 +196,19 @@ class Dehaze(object):
                                                            ).type(torch.cuda.FloatTensor).detach()
 
     def _init_all(self):
+        # liste mit image und augmentieren versionen wird erzeugt 
+        # und eine list mit deren torch tensoren 
         self._init_images()
+        # image net and mask net werden initialsisert
         self._init_nets()
+        # if flag_set, creates ambient_net
+        # initialize athmospheric rgb value and transferts it to tensor
         self._init_ambient()
+        # inits noisy input images for image net and mask net and [uniform, range -0.5, 0.5], if selected, ambient_net (but here meshgrid instead noise !)
         self._init_inputs()
+        # get parameters for image net and mask net and, if selected, ambient_net, and to list
         self._init_parameters()
+        # inits self.mse_loss and self.blur_loss
         self._init_loss()
 
     def optimize(self):
@@ -233,8 +244,11 @@ class Dehaze(object):
             aug = 0
             reg_std = 0
         else:
+            # augmentation is off, always return input image.
             aug = self._get_augmentation(step)
             reg_std = 1 / 30.
+        
+        #norml_() overwrites tensorvalues with values sampled from normal distribution (mean=0, sigma=1)
         image_net_input = self.image_net_inputs[aug] + (self.image_net_inputs[aug].clone().normal_() * reg_std)
         self.image_out = self.image_net(image_net_input)
 
@@ -249,12 +263,16 @@ class Dehaze(object):
         self.mask_out = self.mask_net(self.mask_net_inputs[aug])
 
         self.blur_out = self.blur_loss(self.mask_out)
+        # t(x)*I(x) + (1-t(x))*A(x)
+        # t(x) transmission map, I(x) haze-free image, A(x)
         self.total_loss = self.mse_loss(self.mask_out * self.image_out + (1 - self.mask_out) * self.ambient_out,
                                  self.images_torch[aug]) + 0.005 * self.blur_out
         if self._is_learning_ambient():
             self.total_loss += 0.1 * self.blur_loss(self.ambient_out)
             if step < 1000:
                 self.total_loss += self.mse_loss(self.ambient_out, self.ambient_val * torch.ones_like(self.ambient_out))
+        
+        # TODO warum nochmal retain_graph=True ???
         self.total_loss.backward(retain_graph=True)
 
 
@@ -264,6 +282,7 @@ class Dehaze(object):
             mask_out_np = np.clip(torch_to_np(self.mask_out), 0, 1)
             ambient_out_np = np.clip(torch_to_np(self.ambient_out), 0, 1)
             psnr = peak_signal_noise_ratio(self.images[0], mask_out_np * image_out_np + (1 - mask_out_np) * ambient_out_np)
+            # named tuple ("DehazeResult", ['learned', 't', 'a', 'psnr'])
             self.current_result = DehazeResult(learned=image_out_np, t=mask_out_np, a=ambient_out_np, psnr=psnr)
             if self.best_result is None or self.best_result.psnr < self.current_result.psnr:
                 self.best_result = self.current_result
@@ -298,6 +317,7 @@ class Dehaze(object):
         save_image(self.image_name + "_a", np.clip(self.final_a, 0, 1))
 
     def t_matting(self, mask_out_np):
+        # opencv function
         refine_t = guidedFilter(self.original_image.transpose(1, 2, 0).astype(np.float32),
                                 mask_out_np[0].astype(np.float32), 50, 1e-4)
         if self.clip:
